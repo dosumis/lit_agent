@@ -2,8 +2,25 @@
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "lit-agent"
+version = "0.1.0"
+description = "Reference extraction agent for analyzing Deepsearch results"
+authors = [{name = "Research Team"}]
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0"
+]
+
 [dependency-groups]
-dev = ["pytest", "pytest-cov"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0"
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

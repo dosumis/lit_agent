@@ -7,21 +7,29 @@
 4. Write minimal code to pass tests (green) - DO NOT MODIFY THE TESTS!
 5. Refactor while keeping tests green, commit
 
-## TDD Workflow Commands
+## TDD Workflow Commands (using uv)
 ```bash
-# Install in development mode
-pip install -e ".[dev]"
+# Install dependencies and sync environment
+uv sync --dev            # Install all dependencies including dev tools
 
 # Run tests
-pytest                    # All tests
-pytest -m unit           # Unit tests only
-pytest -m integration    # Integration tests only
-pytest --cov             # With coverage
+uv run pytest                    # All tests
+uv run pytest -m unit           # Unit tests only
+uv run pytest -m integration    # Integration tests only
+uv run pytest --cov             # With coverage
 
 # Check code quality
-black src/ tests/        # Format code
-ruff src/ tests/         # Lint code
-mypy src/                # Type checking
+uv run black src/ tests/        # Format code
+uv run ruff check src/ tests/   # Lint code
+uv run mypy src/                # Type checking
+
+# Add new dependencies
+uv add requests              # Add runtime dependency
+uv add --dev pytest         # Add development dependency
+
+# Environment management
+uv sync                      # Sync dependencies (production only)
+uv sync --dev               # Sync with development dependencies
 ```
 
 ## FORBIDDEN Patterns
