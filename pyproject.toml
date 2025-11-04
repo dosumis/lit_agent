@@ -10,7 +10,8 @@ authors = [{name = "Research Team"}]
 requires-python = ">=3.9"
 dependencies = [
     "requests>=2.28.0",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "litellm>=1.79.1",
 ]
 
 [dependency-groups]

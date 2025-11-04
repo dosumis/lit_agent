@@ -50,9 +50,16 @@ class TestAnthropicIntegration:
             pytest.skip("ANTHROPIC_API_KEY not found in environment")
 
         agent = AnthropicAgent(api_key)
-        prompt = "Write a hello world program in Python. Please provide a brief answer in 2-3 sentences."
+        prompt = ("What is the first recorded use of Hello World to demonstrate "
+                  "a programming language."
+                  "Please provide a brief answer in 2-3 sentences.")
 
         response = agent.query(prompt)
+
+        # Print the response for verification
+        print(f"\n--- Anthropic Hello World Response ---")
+        print(response)
+        print("--- End Response ---\n")
 
         # Verify we got a meaningful response
         assert isinstance(response, str)
