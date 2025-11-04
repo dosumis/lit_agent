@@ -106,16 +106,27 @@ class FormatValidator(IdentifierValidatorBase):
 class NCBIAPIValidator(IdentifierValidatorBase):
     """Validates identifiers using NCBI API."""
 
-    def __init__(self, timeout: int = 10, rate_limit: float = 0.5):
+    def __init__(
+        self, timeout: int = 10, rate_limit: float = 0.5, email: Optional[str] = None
+    ):
         """Initialize API validator.
 
         Args:
             timeout: Request timeout in seconds
             rate_limit: Minimum time between requests in seconds
+            email: Email address for NCBI API (should be registered with NCBI)
         """
         self.timeout = timeout
         self.rate_limit = rate_limit
         self.last_request_time = 0.0
+
+        # Use provided email or environment variable, with fallback
+        # Note: For production use, email should be registered with NCBI
+        from dotenv import load_dotenv
+        import os
+
+        load_dotenv()
+        self.email = email or os.getenv("NCBI_EMAIL", "developer@localhost")
 
         # NCBI ID Converter API base URL
         self.api_base_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
@@ -195,7 +206,7 @@ class NCBIAPIValidator(IdentifierValidatorBase):
         # Prepare API request
         params = {
             "tool": "lit-agent",
-            "email": "noreply@example.com",  # Required by NCBI
+            "email": self.email,  # Required by NCBI
             "ids": value,
             "format": "json",
         }

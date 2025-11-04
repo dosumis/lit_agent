@@ -42,6 +42,9 @@ cp .env.example .env
 # Edit .env and add your API keys
 OPENAI_API_KEY=your_openai_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
+
+# For academic identifier validation (optional)
+NCBI_EMAIL=your_email@domain.com  # Should be registered with NCBI
 ```
 
 ### Basic Usage
