@@ -11,11 +11,10 @@ Reference extraction agent for analyzing Deepsearch results with unified LLM API
 
 ## Features
 
+- 🤖 **Unified LLM API**: Support for OpenAI, Anthropic, and 100+ other providers via LiteLLM - IMPLEMENTED
 - 🔍 **Reference Extraction**: Extract academic references from Deepsearch results in various formats
-- 🤖 **Unified LLM API**: Support for OpenAI, Anthropic, and 100+ other providers via LiteLLM
 - 📝 **Multiple Citation Formats**: Handle numbered citations ([1]), author-year (Smith et al., 2024), and plain URLs
-- 🧪 **Test-Driven Development**: Comprehensive test suite with real API integration testing
-- ⚡ **Modern Tooling**: Built with uv, black, ruff, and pre-commit hooks
+
 
 ## Quick Start
 
@@ -175,4 +174,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [LiteLLM](https://github.com/BerriAI/litellm) for unified LLM API access
 - Uses [uv](https://github.com/astral-sh/uv) for fast Python package management
 - Code quality maintained with [black](https://github.com/psf/black) and [ruff](https://github.com/astral-sh/ruff)
-- 
+
