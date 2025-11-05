@@ -33,6 +33,7 @@ class AcademicIdentifier:
     source_url: str
     extraction_method: ExtractionMethod
     timestamp: Optional[float] = None
+    topic_validation: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -61,7 +62,7 @@ class IdentifierExtractionResult:
 
     identifiers: List[AcademicIdentifier]
     failed_urls: List[str]
-    extraction_stats: Dict[str, int]
+    extraction_stats: Dict[str, Any]
     processing_time: float = 0.0
 
     @property

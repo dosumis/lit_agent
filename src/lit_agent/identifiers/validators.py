@@ -3,7 +3,7 @@
 import logging
 import re
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
 
 import requests  # type: ignore[import-untyped]
 
@@ -128,8 +128,11 @@ class NCBIAPIValidator(IdentifierValidatorBase):
         load_dotenv()
         self.email = email or os.getenv("NCBI_EMAIL", "developer@localhost")
 
-        # NCBI ID Converter API base URL
+        # NCBI API URLs
         self.api_base_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
+        self.efetch_base_url = (
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        )
 
         # Format validator for basic checks
         self.format_validator = FormatValidator()
@@ -184,6 +187,171 @@ class NCBIAPIValidator(IdentifierValidatorBase):
         except Exception:
             # If API fails, rely on format validation
             return 0.7  # Medium confidence for format-only validation
+
+    def get_article_metadata(
+        self, identifier_type: IdentifierType, value: str
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch article metadata (title, abstract, authors) from NCBI.
+
+        Args:
+            identifier_type: Type of identifier (PMID, PMC, or DOI)
+            value: Identifier value
+
+        Returns:
+            Dictionary with article metadata or None if not found
+        """
+        # First validate the identifier format
+        if not self.format_validator.validate_identifier(identifier_type, value):
+            return None
+
+        try:
+            # Convert identifier to PMID if needed (efetch works best with PMIDs)
+            pmid = self._get_pmid_for_identifier(identifier_type, value)
+            if not pmid:
+                return None
+
+            # Fetch article metadata using efetch
+            return self._fetch_article_metadata(pmid)
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch metadata for {identifier_type.value} {value}: {e}"
+            )
+            return None
+
+    def _get_pmid_for_identifier(
+        self, identifier_type: IdentifierType, value: str
+    ) -> Optional[str]:
+        """Get PMID for any identifier type using ID converter.
+
+        Args:
+            identifier_type: Type of identifier
+            value: Identifier value
+
+        Returns:
+            PMID string or None if not found
+        """
+        if identifier_type == IdentifierType.PMID:
+            return value
+
+        # Use ID converter for PMC and DOI
+        try:
+            result = self._query_ncbi_api(identifier_type, value)
+            if result and "pmid" in result:
+                return result["pmid"]
+            return None
+        except Exception:
+            return None
+
+    def _fetch_article_metadata(self, pmid: str) -> Optional[Dict[str, Any]]:
+        """Fetch article metadata using efetch API.
+
+        Args:
+            pmid: PubMed ID
+
+        Returns:
+            Dictionary with title, abstract, authors, etc.
+        """
+        # Rate limiting
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        if time_since_last < self.rate_limit:
+            time.sleep(self.rate_limit - time_since_last)
+
+        # Prepare efetch API request
+        params = {
+            "db": "pubmed",
+            "id": pmid,
+            "retmode": "xml",
+            "rettype": "abstract",
+            "tool": "lit-agent",
+            "email": self.email,
+        }
+
+        try:
+            response = requests.get(
+                self.efetch_base_url, params=params, timeout=self.timeout
+            )
+            self.last_request_time = time.time()
+
+            if response.status_code == 200:
+                return self._parse_efetch_xml(response.text, pmid)
+            else:
+                logger.warning(
+                    f"efetch API returned status {response.status_code} for PMID {pmid}"
+                )
+                return None
+
+        except requests.RequestException as e:
+            logger.warning(f"efetch API request failed for PMID {pmid}: {e}")
+            return None
+
+    def _parse_efetch_xml(
+        self, xml_content: str, pmid: str
+    ) -> Optional[Dict[str, Any]]:
+        """Parse XML response from efetch to extract metadata.
+
+        Args:
+            xml_content: XML response from efetch
+            pmid: PubMed ID for context
+
+        Returns:
+            Dictionary with parsed metadata
+        """
+        try:
+            from xml.etree import ElementTree as ET
+
+            root = ET.fromstring(xml_content)
+
+            # Find the PubmedArticle element
+            article = root.find(".//PubmedArticle")
+            if article is None:
+                return None
+
+            metadata: Dict[str, Union[str, List[str]]] = {"pmid": pmid}
+
+            # Extract title
+            title_elem = article.find(".//ArticleTitle")
+            if title_elem is not None:
+                metadata["title"] = title_elem.text or ""
+
+            # Extract abstract
+            abstract_elem = article.find(".//AbstractText")
+            if abstract_elem is not None:
+                metadata["abstract"] = abstract_elem.text or ""
+
+            # Extract authors
+            authors = []
+            for author in article.findall(".//Author"):
+                last_name = author.find("LastName")
+                fore_name = author.find("ForeName")
+                if last_name is not None:
+                    author_name = last_name.text or ""
+                    if fore_name is not None and fore_name.text:
+                        author_name = f"{fore_name.text} {author_name}"
+                    authors.append(author_name)
+
+            if authors:
+                metadata["authors"] = authors
+
+            # Extract journal information
+            journal_elem = article.find(".//Journal/Title")
+            if journal_elem is not None:
+                metadata["journal"] = journal_elem.text or ""
+
+            # Extract publication year
+            year_elem = article.find(".//PubDate/Year")
+            if year_elem is not None:
+                metadata["year"] = year_elem.text or ""
+
+            return metadata
+
+        except ET.ParseError as e:
+            logger.warning(f"Failed to parse XML for PMID {pmid}: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Unexpected error parsing metadata for PMID {pmid}: {e}")
+            return None
 
     def _query_ncbi_api(
         self, identifier_type: IdentifierType, value: str
