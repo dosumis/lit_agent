@@ -20,6 +20,7 @@ class ExtractionMethod(Enum):
     URL_PATTERN = "url_pattern"
     API_LOOKUP = "api_lookup"
     WEB_SCRAPING = "web_scraping"
+    PDF_EXTRACTION = "pdf_extraction"
     METADATA_PARSING = "metadata_parsing"
 
 
@@ -33,6 +34,7 @@ class AcademicIdentifier:
     source_url: str
     extraction_method: ExtractionMethod
     timestamp: Optional[float] = None
+    topic_validation: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -61,7 +63,7 @@ class IdentifierExtractionResult:
 
     identifiers: List[AcademicIdentifier]
     failed_urls: List[str]
-    extraction_stats: Dict[str, int]
+    extraction_stats: Dict[str, Any]
     processing_time: float = 0.0
 
     @property

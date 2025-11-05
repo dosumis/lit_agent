@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 from .base import IdentifierType, AcademicIdentifier, IdentifierExtractionResult
 from .extractors import JournalURLExtractor
 from .web_scrapers import WebScrapingExtractor, PDFExtractor
-from .validators import CompositeValidator
+from .validators import CompositeValidator, NCBIAPIValidator
+from .topic_validator import TopicValidator
 
 
 def extract_identifiers_from_bibliography(
@@ -13,6 +14,7 @@ def extract_identifiers_from_bibliography(
     use_web_scraping: bool = False,
     use_api_validation: bool = True,
     use_metapub_validation: bool = True,
+    use_topic_validation: bool = False,
 ) -> IdentifierExtractionResult:
     """Extract academic identifiers from a list of bibliography URLs.
 
@@ -24,6 +26,7 @@ def extract_identifiers_from_bibliography(
         use_web_scraping: Whether to use web scraping for failed extractions (Phase 2)
         use_api_validation: Whether to validate identifiers using NCBI API
         use_metapub_validation: Whether to validate identifiers using metapub
+        use_topic_validation: Whether to validate topic relevance using LLM analysis
 
     Returns:
         IdentifierExtractionResult containing all extracted identifiers and statistics
@@ -66,29 +69,31 @@ def extract_identifiers_from_bibliography(
 
         # Track additional identifiers from Phase 2
         phase2_identifiers = []
-        phase2_failed_urls = []
+        successful_urls = []  # Track URLs that succeeded in Phase 2
 
-        for failed_url in result.failed_urls:
+        # Create a copy of failed_urls to avoid modifying list while iterating
+        for failed_url in result.failed_urls.copy():
             try:
                 # Choose extractor based on URL type
-                if pdf_extractor._is_pdf_url(failed_url):
+                if pdf_extractor.is_pdf_url(failed_url):
                     identifiers = pdf_extractor.extract_from_url(failed_url)
                 else:
                     identifiers = web_extractor.extract_from_url(failed_url)
 
                 if identifiers:
                     phase2_identifiers.extend(identifiers)
-                    # Remove from failed URLs since we found something
-                    if failed_url in result.failed_urls:
-                        result.failed_urls.remove(failed_url)
+                    successful_urls.append(failed_url)  # Track for removal later
                     # Update stats
                     result.extraction_stats["successful_extractions"] += 1
                     result.extraction_stats["failed_extractions"] -= 1
-                else:
-                    phase2_failed_urls.append(failed_url)
             except Exception:
                 # Keep in failed URLs if Phase 2 also fails
-                phase2_failed_urls.append(failed_url)
+                pass
+
+        # Remove successful URLs from failed_urls after iteration completes
+        for successful_url in successful_urls:
+            if successful_url in result.failed_urls:
+                result.failed_urls.remove(successful_url)
 
         # Add Phase 2 identifiers to result
         result.identifiers.extend(phase2_identifiers)
@@ -101,6 +106,83 @@ def extract_identifiers_from_bibliography(
                 result.extraction_stats["pmid_count"] += 1
             elif identifier.type == IdentifierType.PMC:
                 result.extraction_stats["pmc_count"] += 1
+
+    # Phase 3 - Topic validation using LLM analysis
+    if use_topic_validation and result.identifiers:
+        metadata_validator = NCBIAPIValidator()
+        topic_validator = TopicValidator()
+
+        # Track topic validation statistics
+        topic_validation_stats = {
+            "total_validated": 0,
+            "relevant_papers": 0,
+            "irrelevant_papers": 0,
+            "validation_errors": 0,
+            "avg_confidence": 0.0,
+        }
+
+        confidence_scores = []
+
+        for identifier in result.identifiers:
+            try:
+                # Get article metadata
+                metadata = metadata_validator.get_article_metadata(
+                    identifier.type, identifier.value
+                )
+
+                if metadata and ("title" in metadata or "abstract" in metadata):
+                    title = metadata.get("title", "")
+                    abstract = metadata.get("abstract", "")
+
+                    # Validate topic relevance
+                    topic_result = topic_validator.validate_topic_relevance(
+                        title, abstract, metadata.get("pmid", "")
+                    )
+
+                    # Store topic validation results in identifier
+                    identifier.topic_validation = {
+                        "is_relevant": topic_result["is_relevant"],
+                        "confidence": topic_result["confidence"],
+                        "reasoning": topic_result["reasoning"],
+                        "keywords_found": topic_result["keywords_found"],
+                    }
+
+                    # Update statistics
+                    topic_validation_stats["total_validated"] += 1
+                    confidence_scores.append(topic_result["confidence"])
+
+                    if topic_result["is_relevant"]:
+                        topic_validation_stats["relevant_papers"] += 1
+                    else:
+                        topic_validation_stats["irrelevant_papers"] += 1
+
+                else:
+                    # No metadata available for topic validation
+                    identifier.topic_validation = {
+                        "is_relevant": None,
+                        "confidence": 0,
+                        "reasoning": "No title or abstract available for topic validation",
+                        "keywords_found": [],
+                    }
+
+            except Exception as e:
+                topic_validation_stats["validation_errors"] += 1
+                # Store error info
+                identifier.topic_validation = {
+                    "is_relevant": None,
+                    "confidence": 0,
+                    "reasoning": f"Topic validation failed: {str(e)}",
+                    "keywords_found": [],
+                }
+
+        # Calculate average confidence
+        if confidence_scores:
+            topic_validation_stats["avg_confidence"] = sum(confidence_scores) / len(
+                confidence_scores
+            )
+
+        # Add topic validation stats to result
+        result.extraction_stats["topic_validation"] = topic_validation_stats
 
     return result
 

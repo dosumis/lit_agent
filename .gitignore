@@ -36,3 +36,6 @@ htmlcov/
 
 # Documentation
 docs/_build/
+
+# Validation workspace (temporary files and reports)
+validation_workspace/

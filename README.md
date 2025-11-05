@@ -7,12 +7,17 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-Reference extraction agent for analyzing Deepsearch results with unified LLM API access.
+Advanced academic identifier extraction and validation system with comprehensive assessment capabilities.
 
 ## Features
 
-- 🤖 **Unified LLM API**: Support for OpenAI, Anthropic, and 100+ other providers via LiteLLM - IMPLEMENTED
 - 🔍 **Reference Extraction**: Extract academic references from Deepsearch results in various formats
+- 🔍 **Multi-Phase Identifier Extraction**: Extract DOI, PMID, and PMC identifiers from academic URLs using URL patterns, web scraping, and PDF text analysis
+- 🎯 **AI-Powered Topic Validation**: LLM-based relevance assessment to ensure extracted papers match your research domain (e.g., astrocyte biology)
+- 📊 **Comprehensive Validation Pipeline**: Multi-layered validation using format checking, NCBI API verification, and metapub integration
+- 📈 **Detailed Reporting & Visualization**: Interactive HTML reports with charts, statistics, and actionable recommendations
+- 🔬 **Manual Review Guidance**: Systematic sampling strategies and pause-point assessments for quality control
+- 🤖 **Unified LLM API**: Support for OpenAI, Anthropic, and 100+ other providers via LiteLLM
 - 📝 **Multiple Citation Formats**: Handle numbered citations ([1]), author-year (Smith et al., 2024), and plain URLs
 
 
@@ -42,27 +47,187 @@ cp .env.example .env
 OPENAI_API_KEY=your_openai_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 
-# For academic identifier validation (optional)
+# For academic identifier validation (required for validation features)
 NCBI_EMAIL=your_email@domain.com  # Should be registered with NCBI
+NCBI_API_KEY=your_ncbi_key        # Optional but recommended for higher rate limits
 ```
 
-### Basic Usage
+## Usage
+
+### Academic Identifier Extraction
+
+Extract DOI, PMID, and PMC identifiers from academic URLs with comprehensive validation:
 
 ```python
-from lit_agent.agent_connection import create_agent_from_env, OpenAIAgent, AnthropicAgent
+from lit_agent.identifiers import extract_identifiers_from_bibliography
+
+# Basic extraction from URLs
+urls = [
+    "https://pubmed.ncbi.nlm.nih.gov/37674083/",
+    "https://www.nature.com/articles/s41586-023-06812-z",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC11239014/"
+]
+
+result = extract_identifiers_from_bibliography(
+    urls=urls,
+    use_web_scraping=True,      # Enable Phase 2 web scraping
+    use_api_validation=True,    # Enable NCBI API validation
+    use_topic_validation=True   # Enable LLM topic validation
+)
+
+print(f"Found {len(result.identifiers)} identifiers")
+print(f"Success rate: {result.success_rate:.1%}")
+```
+
+### Comprehensive Validation Assessment
+
+Run a complete validation assessment with detailed reporting and visualizations:
+
+```python
+from lit_agent.identifiers.validation_demo import run_validation_assessment_demo
+
+# Run comprehensive validation assessment
+report = run_validation_assessment_demo(
+    urls=None,  # Uses default astrocyte biology test URLs
+    use_topic_validation=True,
+    output_dir="validation_reports",
+    report_name="my_assessment"
+)
+
+# Check validation quality score
+print(f"Validation Quality Score: {report['quality_score']}/100")
+```
+
+This generates:
+- **JSON Report**: Complete validation statistics and metadata
+- **Text Summary**: Human-readable assessment with recommendations
+- **CSV Export**: Detailed paper information for spreadsheet analysis
+- **Interactive HTML**: Visual dashboard with charts and insights
+- **Visualizations**: 6 different chart types analyzing validation performance
+
+### Topic Validation for Specific Research Domains
+
+Validate that extracted papers are relevant to your research topic:
+
+```python
+from lit_agent.identifiers.topic_validator import TopicValidator
+
+validator = TopicValidator()
+
+# Validate a single identifier for astrocyte biology relevance
+identifier = result.identifiers[0]
+validation_result = validator.validate_identifier(identifier)
+
+print(f"Relevant: {validation_result['is_relevant']}")
+print(f"Confidence: {validation_result['confidence']}%")
+print(f"Reasoning: {validation_result['reasoning']}")
+```
+
+### Manual Review Workflow
+
+The system provides systematic guidance for manual review:
+
+```python
+# Generate paper classifications for manual review
+from lit_agent.identifiers.reporting import ValidationReporter
+
+reporter = ValidationReporter()
+report = reporter.generate_validation_report(results, "manual_review")
+
+# Papers needing manual review
+classifications = report["paper_classifications"]
+needs_review = classifications["needs_manual_review"]
+low_confidence = classifications["low_confidence_relevant"]
+
+print(f"Papers requiring manual review: {len(needs_review)}")
+print(f"Low confidence papers: {len(low_confidence)}")
+```
+
+### LLM Integration
+
+Use the unified LLM API for custom analyses:
+
+```python
+from lit_agent.agent_connection import create_agent_from_env
 
 # Create agents from environment variables
-openai_agent = create_agent_from_env("openai")
-anthropic_agent = create_agent_from_env("anthropic")
-
-# Or create directly with API keys
-agent = OpenAIAgent("your-api-key")
-response = agent.query("Write a hello world program in Python")
-
-# Use any LiteLLM-supported model directly
-from lit_agent.agent_connection import LiteLLMAgent
-agent = LiteLLMAgent("gpt-4")  # Uses environment variables
+agent = create_agent_from_env("anthropic")
+response = agent.query("Analyze this paper abstract for astrocyte biology relevance...")
 ```
+
+### Command Line Interface
+
+Run validation assessments directly from the command line:
+
+```bash
+# Run demo with default astrocyte biology URLs
+uv run python -m lit_agent.identifiers.validation_demo
+
+# Or run with Python directly
+python src/lit_agent/identifiers/validation_demo.py
+
+# Check the generated reports
+ls demo_reports/
+# validation_demo_20241105_143022.json
+# validation_demo_20241105_143022_summary.txt
+# validation_demo_20241105_143022_papers.csv
+# validation_demo_20241105_143022.html
+```
+
+The demo script provides:
+- ✅ **Real-time Progress**: Live updates on extraction and validation progress
+- 📊 **Immediate Results**: Success rates, identifier counts, and confidence distributions
+- 🎯 **Topic Analysis**: Relevance assessment for astrocyte biology research
+- 💡 **Actionable Recommendations**: Specific suggestions for quality improvement
+- 🌐 **Interactive Reports**: HTML dashboard with embedded visualizations
+
+## Troubleshooting
+
+### Common Issues
+
+**1. NCBI API Rate Limiting**
+```bash
+# Error: HTTPSConnectionPool... Read timed out
+# Solution: Add NCBI API key and email to .env
+NCBI_EMAIL=your_email@domain.com
+NCBI_API_KEY=your_ncbi_key
+```
+
+**2. LLM API Errors**
+```bash
+# Error: No API key provided
+# Solution: Verify your .env file has the correct keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**3. Missing Dependencies**
+```bash
+# Error: No module named 'matplotlib'
+# Solution: Install visualization dependencies
+uv sync --dev
+# or
+pip install matplotlib beautifulsoup4 pypdf lxml
+```
+
+**4. Low Validation Quality Scores**
+- **Check Topic Validation**: Ensure your research domain matches the built-in astrocyte biology validation
+- **Review URLs**: Verify input URLs are from academic sources
+- **API Connectivity**: Confirm NCBI API access is working
+- **Manual Review**: Use the paper classifications to identify systematic issues
+
+### Performance Optimization
+
+**For Large URL Lists**:
+- Enable caching for topic validation results
+- Use batch processing for NCBI API calls
+- Consider running validation in parallel chunks
+- Monitor API rate limits and adjust delays
+
+**For Custom Research Domains**:
+- Modify the topic validation prompts in `topic_validator.py`
+- Update keyword lists for your specific field
+- Adjust confidence thresholds based on domain expertise
 
 ## Development
 
@@ -129,22 +294,36 @@ UserWarning: ANTHROPIC_API_KEY not found - falling back to mock test.
 --- Anthropic Hello World Response (MOCK) ---
 ```
 
-## Project Scope
+## Validation Assessment Features
 
-**Current Focus**: Reference extraction from Deepsearch results
+### Multi-Phase Extraction Pipeline
 
-### Supported Reference Types
-- Conventional academic references
-- Plain URLs
-- Numbered citations ([1], [2], etc.)
-- Author-year citations (Osumi et al., 2025)
-- Bibliography with miniref style citations
+1. **Phase 1 - URL Pattern Extraction**: Fast extraction using regex patterns for known journal URLs
+2. **Phase 2 - Web Scraping**: BeautifulSoup-based scraping for meta tags and JSON-LD data
+3. **Phase 3 - PDF Text Analysis**: LLM-powered extraction from PDF content when available
 
-### Key Capabilities
-- Generate key-value pairs linking references to citations in text
-- Intelligent extraction of reference identifiers
-- URL resolution and page scraping for reference validation
-- Handle various citation formats found in academic literature
+### Validation Methods
+
+- **Format Validation**: Verify identifier formats (DOI, PMID, PMC patterns)
+- **NCBI API Validation**: Real-time verification against PubMed database with metadata retrieval
+- **Metapub Integration**: Cross-validation using metapub library
+- **Topic Validation**: LLM-based assessment of paper relevance to research domains
+
+### Reporting & Analytics
+
+- **Comprehensive Statistics**: Success rates, processing times, confidence distributions
+- **Interactive Visualizations**: 6 chart types including confidence histograms, method comparisons, and topic analysis
+- **Quality Scoring**: Data-driven assessment with actionable recommendations
+- **Manual Review Guidance**: Stratified sampling strategies based on confidence scores
+
+### Pause-Point Assessment
+
+The system provides systematic checkpoints for quality control:
+
+- **Validation Quality Score**: 0-100 rating based on relevance, confidence, and success rates
+- **Automated Recommendations**: Specific suggestions for improving extraction quality
+- **Paper Classifications**: Systematic categorization for manual review prioritization
+- **Statistical Robustness**: Confidence intervals and sample size recommendations
 
 ## Architecture
 
