@@ -308,7 +308,7 @@ class NCBIAPIValidator(IdentifierValidatorBase):
             if article is None:
                 return None
 
-            metadata: Dict[str, Union[str, List[str]]] = {"pmid": pmid}
+            metadata: Dict[str, Any] = {"pmid": pmid}
 
             # Extract title
             title_elem = article.find(".//ArticleTitle")
