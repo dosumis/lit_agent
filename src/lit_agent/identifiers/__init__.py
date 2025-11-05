@@ -25,6 +25,9 @@ from .validators import (
     NCBIAPIValidator,
     MetapubValidator,
 )
+from .topic_validator import TopicValidator
+from .reporting import ValidationReporter
+from .visualizations import ValidationVisualizer
 
 # High-level API functions
 from .api import (
@@ -55,6 +58,10 @@ __all__ = [
     "FormatValidator",
     "NCBIAPIValidator",
     "MetapubValidator",
+    "TopicValidator",
+    # Reporting
+    "ValidationReporter",
+    "ValidationVisualizer",
     # API functions
     "extract_identifiers_from_bibliography",
     "extract_identifiers_from_url",

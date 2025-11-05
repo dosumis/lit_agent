@@ -323,7 +323,7 @@ class PDFExtractor(IdentifierExtractorBase):
             return []
 
         # Only process PDF URLs
-        if not self._is_pdf_url(url):
+        if not self.is_pdf_url(url):
             return []
 
         try:
@@ -358,7 +358,7 @@ class PDFExtractor(IdentifierExtractorBase):
             logger.warning(f"PDF extraction failed for {url}: {e}")
             return []
 
-    def _is_pdf_url(self, url: str) -> bool:
+    def is_pdf_url(self, url: str) -> bool:
         """Check if URL likely points to a PDF."""
         return url.lower().endswith(".pdf") or ".pdf?" in url.lower()
 

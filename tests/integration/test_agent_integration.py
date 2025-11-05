@@ -1,10 +1,16 @@
 """Integration tests for agent connections with real API calls."""
 
-import pytest
-import os
-import warnings
-from unittest.mock import Mock, patch
-from lit_agent.agent_connection import (
+# Load environment variables first (following CLAUDE.md requirements)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import pytest  # noqa: E402
+import os  # noqa: E402
+import warnings  # noqa: E402
+from unittest.mock import Mock, patch  # noqa: E402
+
+from lit_agent.agent_connection import (  # noqa: E402
     create_agent_from_env,
     OpenAIAgent,
     AnthropicAgent,
