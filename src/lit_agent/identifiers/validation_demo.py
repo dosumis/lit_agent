@@ -381,7 +381,7 @@ if __name__ == "__main__":
         report = run_validation_assessment_demo(
             use_topic_validation=True,  # Enable topic validation for full demo
             use_deepsearch_urls=True,  # Use URLs from deepsearch files
-            sample_size=None,  # Use full URL set for comprehensive validation
+            sample_size=100,  # Use 100 URL sample for cost-effective validation
             output_dir="demo_reports",
         )
         print("\n🎉 Demo completed successfully!")

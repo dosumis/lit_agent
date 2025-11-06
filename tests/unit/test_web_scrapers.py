@@ -206,7 +206,7 @@ class TestPDFExtractor:
             doi_ids = [id for id in identifiers if id.type == IdentifierType.DOI]
             assert len(doi_ids) == 1
             assert doi_ids[0].value == "10.1234/test"
-            assert doi_ids[0].extraction_method == ExtractionMethod.API_LOOKUP
+            assert doi_ids[0].extraction_method == ExtractionMethod.PDF_EXTRACTION
 
             # Check PMID
             pmid_ids = [id for id in identifiers if id.type == IdentifierType.PMID]
