@@ -382,10 +382,12 @@ if __name__ == "__main__":
             use_topic_validation=True,  # Enable topic validation for full demo
             use_deepsearch_urls=True,  # Use URLs from deepsearch files
             sample_size=100,  # Use 100 URL sample for cost-effective validation
-            output_dir="demo_reports",
+            output_dir="validation_workspace/demo_reports",
         )
         print("\n🎉 Demo completed successfully!")
-        print("Check the 'demo_reports' directory for generated files.")
+        print(
+            "Check the 'validation_workspace/demo_reports' directory for generated files."
+        )
 
     except Exception as e:
         print(f"\n💥 Demo failed: {e}")
