@@ -229,6 +229,60 @@ def run_validation_assessment_demo(
                 print(f"   Most common keywords: {', '.join(keywords)}")
             print()
 
+        # Show stratified extraction performance
+        if "stratified_analysis" in report:
+            stratified = report["stratified_analysis"]
+            print("🔬 Extraction Method Performance:")
+
+            summary = stratified["summary"]
+            breakdown = summary["extraction_method_breakdown"]
+            print(
+                f"   URL Pattern Extraction: {breakdown['url_pattern_percentage']:.1f}% of papers"
+            )
+            print(
+                f"   Web Scraping: {breakdown['web_scraping_percentage']:.1f}% of papers"
+            )
+            print(
+                f"   PDF Extraction: {breakdown['pdf_extraction_percentage']:.1f}% of papers"
+            )
+
+            # Show best performing method
+            method_comparison = stratified.get("method_comparison", {})
+            if method_comparison.get("best_method_by_count"):
+                best = method_comparison["best_method_by_count"]
+                print(
+                    f"   Best method by volume: {best['method']} ({best['count']} papers)"
+                )
+
+            print()
+
+        # Show failure analysis
+        if "failure_analysis" in report:
+            failure_analysis = report["failure_analysis"]
+            total_failures = failure_analysis["total_failed_urls"]
+            print("❌ Failure Analysis:")
+            print(f"   Total failed URLs: {total_failures}")
+
+            if total_failures > 0:
+                patterns = failure_analysis["failure_patterns"]
+                print("   Failure breakdown:")
+                for pattern, count in patterns.items():
+                    if count > 0:
+                        percentage = (count / total_failures) * 100
+                        print(
+                            f"     - {pattern.replace('_', ' ').title()}: {count} ({percentage:.1f}%)"
+                        )
+
+                # Show top failing domains
+                domain_stats = failure_analysis["failure_by_domain"]
+                if domain_stats:
+                    top_domain = max(domain_stats.items(), key=lambda x: x[1])
+                    print(
+                        f"   Top failing domain: {top_domain[0]} ({top_domain[1]} failures)"
+                    )
+
+            print()
+
         # Show actionable recommendations
         print("💡 RECOMMENDATIONS:")
         for i, recommendation in enumerate(report["recommendations"], 1):
@@ -327,11 +381,13 @@ if __name__ == "__main__":
         report = run_validation_assessment_demo(
             use_topic_validation=True,  # Enable topic validation for full demo
             use_deepsearch_urls=True,  # Use URLs from deepsearch files
-            sample_size=100,  # Sample 100 URLs for cost-effective testing
-            output_dir="demo_reports",
+            sample_size=100,  # Use 100 URL sample for cost-effective validation
+            output_dir="validation_workspace/demo_reports",
         )
         print("\n🎉 Demo completed successfully!")
-        print("Check the 'demo_reports' directory for generated files.")
+        print(
+            "Check the 'validation_workspace/demo_reports' directory for generated files."
+        )
 
     except Exception as e:
         print(f"\n💥 Demo failed: {e}")

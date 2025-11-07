@@ -20,6 +20,7 @@ class ExtractionMethod(Enum):
     URL_PATTERN = "url_pattern"
     API_LOOKUP = "api_lookup"
     WEB_SCRAPING = "web_scraping"
+    PDF_EXTRACTION = "pdf_extraction"
     METADATA_PARSING = "metadata_parsing"
 
 

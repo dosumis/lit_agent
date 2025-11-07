@@ -56,6 +56,14 @@ class ValidationReporter:
         # Generate validation analysis
         validation_analysis = self._analyze_validation_performance(all_identifiers)
 
+        # Generate stratified performance analysis
+        stratified_analysis = self._analyze_stratified_performance(
+            all_identifiers, [url for result in results for url in result.failed_urls]
+        )
+
+        # Generate failure analysis
+        failure_analysis = self._generate_failure_analysis(results)
+
         # Generate topic validation analysis (if available)
         topic_analysis = self._analyze_topic_validation(all_identifiers)
 
@@ -80,6 +88,8 @@ class ValidationReporter:
             },
             "summary_statistics": stats,
             "validation_analysis": validation_analysis,
+            "stratified_analysis": stratified_analysis,
+            "failure_analysis": failure_analysis,
             "topic_analysis": topic_analysis,
             "f1_metrics": f1_metrics,
             "paper_classifications": paper_classifications,
@@ -143,6 +153,206 @@ class ValidationReporter:
             )
 
         return stats
+
+    def _analyze_stratified_performance(
+        self,
+        identifiers: List[AcademicIdentifier],
+        failed_urls: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Analyze performance stratified by extraction method."""
+        from .base import ExtractionMethod
+
+        if failed_urls is None:
+            failed_urls = []
+
+        # Group identifiers by extraction method
+        by_method: Dict[Any, List[AcademicIdentifier]] = {
+            ExtractionMethod.URL_PATTERN: [],
+            ExtractionMethod.WEB_SCRAPING: [],
+            ExtractionMethod.PDF_EXTRACTION: [],
+        }
+
+        for identifier in identifiers:
+            if identifier.extraction_method in by_method:
+                by_method[identifier.extraction_method].append(identifier)
+
+        # Calculate statistics for each method
+        stratified_stats = {}
+        total_successes = len(identifiers)
+        total_attempts = total_successes + len(failed_urls)
+
+        for method, method_identifiers in by_method.items():
+            method_name = method.value
+            count = len(method_identifiers)
+
+            # Calculate confidence stats
+            if method_identifiers:
+                confidences = [i.confidence for i in method_identifiers]
+                avg_confidence = sum(confidences) / len(confidences)
+                high_conf_count = len(
+                    [i for i in method_identifiers if i.confidence >= 0.8]
+                )
+
+                # Topic validation stats if available
+                topic_validated = [
+                    i for i in method_identifiers if i.topic_validation is not None
+                ]
+                topic_stats = {}
+                if topic_validated:
+                    relevant_count = len(
+                        [
+                            i
+                            for i in topic_validated
+                            if i.topic_validation
+                            and i.topic_validation.get("is_relevant", False)
+                        ]
+                    )
+                    topic_stats = {
+                        "total_validated": len(topic_validated),
+                        "relevant_papers": relevant_count,
+                        "relevance_rate": relevant_count / len(topic_validated)
+                        if topic_validated
+                        else 0,
+                        "avg_topic_confidence": sum(
+                            i.topic_validation.get("confidence", 0)
+                            for i in topic_validated
+                            if i.topic_validation
+                        )
+                        / len(topic_validated)
+                        if topic_validated
+                        else 0,
+                    }
+            else:
+                avg_confidence = 0
+                high_conf_count = 0
+                topic_stats = {}
+
+            stratified_stats[method_name] = {
+                "total_identifiers": count,
+                "success_rate": count / total_attempts if total_attempts > 0 else 0,
+                "avg_confidence": avg_confidence,
+                "high_confidence_count": high_conf_count,
+                "high_confidence_rate": high_conf_count / count if count > 0 else 0,
+                "topic_validation": topic_stats,
+                "identifier_types": {
+                    "doi": len(
+                        [i for i in method_identifiers if i.type.value == "doi"]
+                    ),
+                    "pmid": len(
+                        [i for i in method_identifiers if i.type.value == "pmid"]
+                    ),
+                    "pmc": len(
+                        [i for i in method_identifiers if i.type.value == "pmc"]
+                    ),
+                },
+            }
+
+        # Overall summary
+        summary = {
+            "total_identifiers": total_successes,
+            "total_failed_urls": len(failed_urls),
+            "overall_success_rate": total_successes / total_attempts
+            if total_attempts > 0
+            else 0,
+            "extraction_method_breakdown": {
+                "url_pattern_percentage": len(by_method[ExtractionMethod.URL_PATTERN])
+                / total_successes
+                * 100
+                if total_successes > 0
+                else 0,
+                "web_scraping_percentage": len(by_method[ExtractionMethod.WEB_SCRAPING])
+                / total_successes
+                * 100
+                if total_successes > 0
+                else 0,
+                "pdf_extraction_percentage": len(
+                    by_method[ExtractionMethod.PDF_EXTRACTION]
+                )
+                / total_successes
+                * 100
+                if total_successes > 0
+                else 0,
+            },
+        }
+
+        return {
+            "stratified_performance": stratified_stats,
+            "summary": summary,
+            "method_comparison": self._compare_extraction_methods(by_method),
+        }
+
+    def _compare_extraction_methods(
+        self, by_method: Dict[Any, List[AcademicIdentifier]]
+    ) -> Dict[str, Any]:
+        """Compare performance across extraction methods."""
+        from .base import ExtractionMethod
+
+        comparison: Dict[str, Any] = {
+            "best_method_by_count": None,
+            "best_method_by_confidence": None,
+            "best_method_by_relevance": None,
+            "recommendations": [],
+        }
+
+        # Find best method by count
+        counts = {
+            method.value: len(identifiers) for method, identifiers in by_method.items()
+        }
+        if any(counts.values()):
+            best_count_method = max(counts.items(), key=lambda x: x[1])
+            comparison["best_method_by_count"] = {
+                "method": best_count_method[0],
+                "count": best_count_method[1],
+            }
+
+        # Find best method by confidence
+        avg_confidences = {}
+        for method, identifiers in by_method.items():
+            if identifiers:
+                avg_conf = sum(i.confidence for i in identifiers) / len(identifiers)
+                avg_confidences[method.value] = avg_conf
+
+        if avg_confidences:
+            best_conf_method = max(avg_confidences.items(), key=lambda x: x[1])
+            comparison["best_method_by_confidence"] = {
+                "method": best_conf_method[0],
+                "confidence": best_conf_method[1],
+            }
+
+        # Generate recommendations based on performance
+        total_identifiers = sum(len(identifiers) for identifiers in by_method.values())
+        if total_identifiers > 0:
+            url_pattern_rate = (
+                len(by_method.get(ExtractionMethod.URL_PATTERN, [])) / total_identifiers
+            )
+            web_scraping_rate = (
+                len(by_method.get(ExtractionMethod.WEB_SCRAPING, []))
+                / total_identifiers
+            )
+            pdf_rate = (
+                len(by_method.get(ExtractionMethod.PDF_EXTRACTION, []))
+                / total_identifiers
+            )
+
+            if url_pattern_rate > 0.8:
+                comparison["recommendations"].append(
+                    "Excellent URL pattern extraction - most papers have direct identifiers"
+                )
+            elif web_scraping_rate > 0.4:
+                comparison["recommendations"].append(
+                    "Significant web scraping usage - consider improving URL pattern detection"
+                )
+            elif pdf_rate > 0.2:
+                comparison["recommendations"].append(
+                    "High PDF extraction rate - many papers only available as PDFs"
+                )
+
+            if url_pattern_rate < 0.3:
+                comparison["recommendations"].append(
+                    "Low direct URL extraction - review URL pattern matching"
+                )
+
+        return comparison
 
     def _analyze_validation_performance(
         self, identifiers: List[AcademicIdentifier]
@@ -844,3 +1054,140 @@ class ValidationReporter:
                 writer.writerow(row)
 
         logger.info(f"CSV export saved: {csv_path}")
+
+    def _generate_failure_analysis(
+        self, results: List[IdentifierExtractionResult]
+    ) -> Dict[str, Any]:
+        """Generate comprehensive failure analysis with simple list format."""
+        all_failed_urls = []
+        failure_stats: Dict[str, Any] = {
+            "total_failed_urls": 0,
+            "failure_by_domain": {},
+            "failure_patterns": {
+                "pdf_links": 0,
+                "redirect_issues": 0,
+                "access_denied": 0,
+                "timeout_errors": 0,
+                "format_issues": 0,
+                "unknown_errors": 0,
+            },
+            "detailed_failures": [],
+        }
+
+        # Collect all failed URLs from results
+        for result in results:
+            for failed_url in result.failed_urls:
+                all_failed_urls.append(failed_url)
+
+                # Extract domain for categorization
+                try:
+                    from urllib.parse import urlparse
+
+                    domain = urlparse(failed_url).netloc
+                    failure_stats["failure_by_domain"][domain] = (
+                        failure_stats["failure_by_domain"].get(domain, 0) + 1
+                    )
+                except Exception:
+                    failure_stats["failure_by_domain"]["unknown"] = (
+                        failure_stats["failure_by_domain"].get("unknown", 0) + 1
+                    )
+
+                # Categorize failure type based on URL pattern
+                failure_entry = {
+                    "url": failed_url,
+                    "category": self._categorize_failure(failed_url),
+                    "domain": domain if "domain" in locals() else "unknown",
+                }
+
+                failure_stats["detailed_failures"].append(failure_entry)
+
+                # Update pattern counters
+                category = failure_entry["category"]
+                if category in failure_stats["failure_patterns"]:
+                    failure_stats["failure_patterns"][category] += 1
+
+        failure_stats["total_failed_urls"] = len(all_failed_urls)
+
+        # Generate simple failure list for easy review
+        failure_stats["simple_failure_list"] = [
+            f"{entry['url']} (Category: {entry['category']}, Domain: {entry['domain']})"
+            for entry in failure_stats["detailed_failures"]
+        ]
+
+        # Add recommendations
+        failure_stats["recommendations"] = self._generate_failure_recommendations(
+            failure_stats
+        )
+
+        return failure_stats
+
+    def _categorize_failure(self, url: str) -> str:
+        """Categorize failure type based on URL characteristics."""
+        url_lower = url.lower()
+
+        if url_lower.endswith(".pdf"):
+            return "pdf_links"
+        elif "doi.org" in url_lower or "dx.doi.org" in url_lower:
+            return "redirect_issues"
+        elif "access" in url_lower or "login" in url_lower:
+            return "access_denied"
+        elif any(pattern in url_lower for pattern in ["pubmed", "ncbi", "pmc"]):
+            return "format_issues"  # Likely format/parsing issues
+        else:
+            return "unknown_errors"
+
+    def _generate_failure_recommendations(
+        self, failure_stats: Dict[str, Any]
+    ) -> List[str]:
+        """Generate actionable recommendations based on failure patterns."""
+        recommendations = []
+        total_failures = failure_stats["total_failed_urls"]
+        patterns = failure_stats["failure_patterns"]
+
+        if total_failures == 0:
+            recommendations.append("Excellent! No URL extraction failures detected.")
+            return recommendations
+
+        # Specific recommendations based on failure patterns
+        if patterns["pdf_links"] > total_failures * 0.3:
+            recommendations.append(
+                f"High PDF failure rate ({patterns['pdf_links']}/{total_failures}) - "
+                "Consider improving PDF text extraction or LLM processing"
+            )
+
+        if patterns["redirect_issues"] > total_failures * 0.2:
+            recommendations.append(
+                f"Redirect issues detected ({patterns['redirect_issues']}/{total_failures}) - "
+                "Review DOI resolution and redirect handling"
+            )
+
+        if patterns["access_denied"] > 0:
+            recommendations.append(
+                f"Access denied issues ({patterns['access_denied']}/{total_failures}) - "
+                "Some papers may be behind paywalls or require authentication"
+            )
+
+        if patterns["format_issues"] > total_failures * 0.4:
+            recommendations.append(
+                f"Format/parsing issues ({patterns['format_issues']}/{total_failures}) - "
+                "Review URL pattern matching and metadata extraction"
+            )
+
+        # Domain-specific recommendations
+        domain_stats = failure_stats["failure_by_domain"]
+        if domain_stats:
+            top_failing_domain = max(domain_stats.items(), key=lambda x: x[1])
+            if top_failing_domain[1] > 3:  # More than 3 failures from same domain
+                recommendations.append(
+                    f"Domain '{top_failing_domain[0]}' has {top_failing_domain[1]} failures - "
+                    "investigate site-specific extraction issues"
+                )
+
+        # Overall failure rate recommendation
+        if total_failures > 50:
+            recommendations.append(
+                f"High overall failure count ({total_failures}) - "
+                "consider reviewing URL quality and extraction robustness"
+            )
+
+        return recommendations
