@@ -3,7 +3,7 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import json
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
 from .base import IdentifierType, AcademicIdentifier, IdentifierExtractionResult
 from .extractors import JournalURLExtractor
