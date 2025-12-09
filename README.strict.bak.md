@@ -1,6 +1,9 @@
 # lit-agent
 
 [![Tests](https://github.com/dosumis/lit_agent/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/dosumis/lit_agent/actions/workflows/test.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/dosumis/lit_agent/main/.github/badges/coverage.json)](https://github.com/dosumis/lit_agent/actions/workflows/test.yml)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
@@ -282,13 +285,14 @@ pip install matplotlib beautifulsoup4 pypdf lxml
 # Install development dependencies
 uv sync --dev
 
-```
+# Install pre-commit hooks (recommended)
+uv run pre-commit install
 ```
 
 ### Testing
 
 ```bash
-# Run all tests (currently only tests required, code quality checks paused)
+# Run all tests
 uv run pytest
 
 # Run only unit tests (fast)
@@ -301,6 +305,22 @@ uv run pytest -m integration
 uv run pytest --cov
 ```
 
+### Code Quality
+
+```bash
+# Format code
+uv run black src/ tests/
+
+# Lint and fix issues
+uv run ruff check --fix src/ tests/
+
+# Type checking
+uv run mypy src/
+
+# Run all quality checks
+uv run pre-commit run --all-files
+```
+
 ## Testing Strategy
 
 This project follows **strict Test-Driven Development** with real integration testing:
@@ -308,7 +328,7 @@ This project follows **strict Test-Driven Development** with real integration te
 - **Unit Tests**: Fast, isolated tests with mocks
 - **Integration Tests**: Real API calls when keys available, mock fallback with warnings
 - **No Mocks for Integration**: Real API testing is prioritized, mocks only as fallback
-- Coverage tracking optional for now
+- **Coverage Requirement**: Minimum 80% test coverage
 
 ### Integration Test Behavior
 
@@ -367,7 +387,7 @@ The system provides systematic checkpoints for quality control:
 3. Write tests first (TDD approach)
 4. Implement the feature
 5. Ensure all tests pass (`uv run pytest`)
-6. (Optional) Run additional checks later if re-enabled
+6. Run code quality checks (`uv run pre-commit run --all-files`)
 7. Commit your changes (`git commit -m 'Add amazing feature'`)
 8. Push to the branch (`git push origin feature/amazing-feature`)
 9. Open a Pull Request
@@ -380,4 +400,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with [LiteLLM](https://github.com/BerriAI/litellm) for unified LLM API access
 - Uses [uv](https://github.com/astral-sh/uv) for fast Python package management
- - Code quality checks are currently paused (focus on tests)
+- Code quality maintained with [black](https://github.com/psf/black) and [ruff](https://github.com/astral-sh/ruff)

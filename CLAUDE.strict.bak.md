@@ -16,7 +16,16 @@ uv sync --dev            # Install all dependencies including dev tools
 uv run pytest                    # All tests
 uv run pytest -m unit           # Unit tests only
 uv run pytest -m integration    # Integration tests only
- uv run pytest --cov             # With coverage (optional)
+uv run pytest --cov             # With coverage
+
+# Code quality (run before committing!)
+uv run black src/ tests/        # Format code
+uv run ruff check --fix src/ tests/   # Lint and auto-fix
+uv run mypy src/                # Type checking
+
+# Pre-commit hooks (recommended)
+uv run pre-commit install       # Install git hooks
+uv run pre-commit run --all-files   # Run on all files
 
 # Add new dependencies
 uv add requests              # Add runtime dependency
@@ -28,7 +37,10 @@ uv sync --dev               # Sync with development dependencies
 ```
 
 ## Code Quality Strategy
-Temporarily paused. Focus on tests (unit/integration) for now.
+- **Pre-commit hooks**: Auto-run black/ruff/mypy before each commit
+- **Local checks**: Always run `black` and `ruff --fix` before pushing
+- **GitHub Actions**: Runs same checks on PRs - should never fail if run locally
+- **IDE integration**: Configure your editor to run formatters on save
 
 ## Environment Configuration
 - **ALWAYS use dotenv**: Use `from dotenv import load_dotenv; load_dotenv()` for environment variables, never use `os.getenv()` directly
@@ -86,3 +98,4 @@ Analyse Deepsearch results to extract references in various formats and intellig
 - URL resolution and scraping provides the safest approach for identifier extraction
 - Focus on robust parsing of different citation styles
 - Real integration testing with actual Deepsearch data required
+

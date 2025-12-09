@@ -14,7 +14,7 @@ This project strictly follows TDD principles:
 
 - `tests/unit/` - Fast, isolated unit tests
 - `tests/integration/` - Tests with real external dependencies
-- Coverage tracking optional for now
+- Coverage minimum: 80%
 
 ## Forbidden Patterns
 
@@ -44,7 +44,7 @@ pytest -m unit
 # Run only integration tests
 pytest -m integration
 
-# Generate coverage report (optional)
+# Generate coverage report
 pytest --cov=lit_agent --cov-report=html
 ```
 
