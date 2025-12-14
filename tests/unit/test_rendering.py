@@ -66,8 +66,8 @@ def test_render_bibliography_vancouver_style():
     rendered, meta = render_bibliography_to_strings(result, style="vancouver")
 
     # Should use citeproc renderer with citeproc-py-styles installed
-    assert meta["renderer"] == "citeproc", (
-        "Expected citeproc renderer but got fallback. "
+    assert meta["renderer"] == "citeproc-py", (
+        "Expected citeproc-py renderer but got fallback. "
         "Ensure citeproc-py-styles is installed: pip install citeproc-py-styles"
     )
     assert meta["style"] == "vancouver"
