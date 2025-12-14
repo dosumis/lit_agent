@@ -198,7 +198,7 @@ def test_render_bibliography_empty_citations():
     rendered, meta = render_bibliography_to_strings(result, style="vancouver")
 
     # Even with no citations, should use citeproc if available
-    assert meta["renderer"] in ["citeproc", "fallback"]
+    assert meta["renderer"] in ["citeproc-py", "fallback"]
     assert meta["style"] == "vancouver"
     assert len(rendered) == 0, "Should have no bibliography entries"
 
