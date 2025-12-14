@@ -134,7 +134,7 @@ def test_render_bibliography_chicago_style():
 
     rendered, meta = render_bibliography_to_strings(result, style="chicago")
 
-    assert meta["renderer"] == "citeproc"
+    assert meta["renderer"] == "citeproc-py"
     assert meta["style"] == "chicago"
     assert len(rendered) == 1
     assert rendered[0]  # Non-empty
