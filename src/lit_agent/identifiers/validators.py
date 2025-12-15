@@ -430,8 +430,16 @@ class MetapubValidator(IdentifierValidatorBase):
                 return article is not None
 
             elif identifier_type == IdentifierType.DOI:
-                # Try to get PMID for DOI using CrossRefFetcher
-                pmid = metapub.CrossRefFetcher().pmid_from_doi(value)
+                # Try to get PMID for DOI using CrossRefFetcher (version-dependent API)
+                fetcher = metapub.CrossRefFetcher()
+
+                pmid = None
+                if hasattr(fetcher, "pmid_from_doi"):
+                    pmid = fetcher.pmid_from_doi(value)
+                elif hasattr(fetcher, "article_by_doi"):
+                    article = fetcher.article_by_doi(value)
+                    pmid = getattr(article, "pmid", None) if article else None
+
                 return pmid is not None
 
             elif identifier_type == IdentifierType.PMC:
