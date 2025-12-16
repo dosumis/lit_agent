@@ -3,13 +3,18 @@
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 import json
+import logging
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
+
+import httpx
 
 from .base import IdentifierType, AcademicIdentifier, IdentifierExtractionResult
 from .extractors import JournalURLExtractor
 from .web_scrapers import WebScrapingExtractor, PDFExtractor
 from .validators import CompositeValidator, NCBIAPIValidator
 from .topic_validator import TopicValidator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -437,15 +442,31 @@ def _build_csl_citation(
 
     preferred_identifier = _select_preferred_identifier(identifiers)
 
+    # Always attempt metadata lookup
     metadata = None
+
     if metadata_lookup:
+        # Custom metadata function takes precedence
         try:
             metadata = metadata_lookup(
                 preferred_identifier.type, preferred_identifier.value
             )
+            if metadata:
+                citation["resolution"]["methods"].append("metadata_lookup")
         except Exception as exc:  # pragma: no cover - defensive
-            citation["resolution"]["errors"].append(f"metadata lookup failed: {exc}")
-    elif validate:
+            citation["resolution"]["errors"].append(f"custom metadata lookup failed: {exc}")
+
+    # If no metadata yet (no custom function or it failed), fetch from APIs
+    if not metadata:
+        try:
+            metadata = _fetch_metadata_from_apis(preferred_identifier)
+            if metadata:
+                citation["resolution"]["methods"].append("auto_metadata_lookup")
+        except Exception as exc:  # pragma: no cover - defensive
+            citation["resolution"]["errors"].append(f"API metadata lookup failed: {exc}")
+
+    # Handle validation mode separately for backwards compatibility
+    if validate and not metadata:
         metadata_validator = NCBIAPIValidator()
         try:
             metadata = metadata_validator.get_article_metadata(
@@ -454,14 +475,14 @@ def _build_csl_citation(
             citation["resolution"]["validation"]["ncbi"] = (
                 "passed" if metadata else "failed"
             )
+            if metadata and "metadata_lookup" not in citation["resolution"]["methods"]:
+                citation["resolution"]["methods"].append("metadata_lookup")
         except Exception as exc:  # pragma: no cover - defensive
-            citation["resolution"]["errors"].append(f"metadata lookup failed: {exc}")
+            citation["resolution"]["errors"].append(f"validation metadata lookup failed: {exc}")
             citation["resolution"]["validation"]["ncbi"] = "failed"
 
     if metadata:
         _apply_metadata_to_citation(citation, metadata)
-        if "metadata_lookup" not in citation["resolution"]["methods"]:
-            citation["resolution"]["methods"].append("metadata_lookup")
 
     return citation
 
@@ -484,6 +505,89 @@ def _select_preferred_identifier(
     return sorted(
         identifiers, key=lambda identifier: priority.get(identifier.type, 99)
     )[0]
+
+
+def _fetch_metadata_from_apis(identifier: AcademicIdentifier) -> Optional[Dict[str, Any]]:
+    """Fetch metadata from CrossRef (DOI) or NCBI (PMID/PMC).
+
+    Args:
+        identifier: Academic identifier to fetch metadata for
+
+    Returns:
+        Metadata dictionary or None if fetch fails
+    """
+    if identifier.type == IdentifierType.DOI:
+        try:
+            return _fetch_crossref_metadata(identifier.value)
+        except Exception as e:
+            logger.debug(f"CrossRef metadata lookup failed for {identifier.value}: {e}")
+            return None
+
+    elif identifier.type in (IdentifierType.PMID, IdentifierType.PMC):
+        try:
+            validator = NCBIAPIValidator()
+            return validator.get_article_metadata(identifier.type, identifier.value)
+        except Exception as e:
+            logger.debug(f"NCBI metadata lookup failed for {identifier.value}: {e}")
+            return None
+
+    return None
+
+
+def _fetch_crossref_metadata(doi: str) -> Optional[Dict[str, Any]]:
+    """Fetch metadata from CrossRef API for a DOI.
+
+    Args:
+        doi: DOI to fetch metadata for
+
+    Returns:
+        Metadata dictionary in our internal format, or None if fetch fails
+    """
+    url = f"https://api.crossref.org/works/{doi}"
+
+    try:
+        response = httpx.get(url, timeout=10.0)
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        message = data.get("message", {})
+
+        # Map CrossRef response to our metadata format
+        metadata = {}
+
+        if title := message.get("title"):
+            metadata["title"] = title[0] if isinstance(title, list) else title
+
+        if container_title := message.get("container-title"):
+            metadata["journal"] = container_title[0] if isinstance(container_title, list) else container_title
+
+        if authors := message.get("author"):
+            metadata["authors"] = [
+                f"{a.get('family', '')} {a.get('given', '')}".strip()
+                for a in authors
+            ]
+
+        if published := message.get("published"):
+            date_parts = published.get("date-parts", [[]])[0]
+            if date_parts:
+                year = date_parts[0] if len(date_parts) > 0 else None
+                month = date_parts[1] if len(date_parts) > 1 else None
+                day = date_parts[2] if len(date_parts) > 2 else None
+                parts = [str(p) for p in [year, month, day] if p]
+                metadata["pubdate"] = " ".join(parts)
+
+        # Add other fields
+        for field in ["volume", "issue", "page"]:
+            if value := message.get(field):
+                metadata[field if field != "page" else "pages"] = value
+
+        return metadata if metadata else None
+
+    except Exception as e:
+        logger.debug(f"CrossRef API error for DOI {doi}: {e}")
+        return None
 
 
 def _apply_metadata_to_citation(

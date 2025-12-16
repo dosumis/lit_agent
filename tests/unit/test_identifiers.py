@@ -144,6 +144,46 @@ class TestIdentifierExtractionFromDeepsearch:
             assert doi_id.extraction_method == ExtractionMethod.URL_PATTERN
             assert doi_id.source_url == url
 
+    def test_extract_doi_from_nature_urls_with_file_extensions(self):
+        """Test that file extensions are stripped from Nature article IDs before DOI construction."""
+        extractor = JournalURLExtractor()
+
+        test_cases = [
+            # (input_url, expected_doi)
+            ("https://www.nature.com/articles/s41467-025-67223-4_reference.pdf",
+             "10.1038/s41467-025-67223-4"),
+            ("https://www.nature.com/articles/s41467-025-66109-9_reference.pdf",
+             "10.1038/s41467-025-66109-9"),
+            ("https://www.nature.com/articles/s41586-023-06502-w.pdf",
+             "10.1038/s41586-023-06502-w"),
+            ("https://www.nature.com/articles/s41586-023-06502-w.html",
+             "10.1038/s41586-023-06502-w"),
+            ("https://www.nature.com/articles/s41420-024-01886-8.htm",
+             "10.1038/s41420-024-01886-8"),
+            # Ensure we don't break existing functionality (no extension)
+            ("https://www.nature.com/articles/s41586-023-06502-w",
+             "10.1038/s41586-023-06502-w"),
+        ]
+
+        for url, expected_doi in test_cases:
+            identifiers = extractor.extract_from_url(url)
+
+            # Should extract exactly one DOI
+            doi_identifiers = [
+                id for id in identifiers if id.type == IdentifierType.DOI
+            ]
+            assert len(doi_identifiers) == 1, \
+                f"Expected 1 DOI for {url}, got {len(doi_identifiers)}"
+
+            # Check DOI value
+            actual_doi = doi_identifiers[0].value
+            assert actual_doi == expected_doi, \
+                f"URL: {url}\nExpected: {expected_doi}\nGot: {actual_doi}"
+
+            # Verify properties
+            assert doi_identifiers[0].confidence >= 0.8
+            assert doi_identifiers[0].extraction_method == ExtractionMethod.URL_PATTERN
+
     def test_batch_extraction_from_deepsearch_urls(self, sample_deepsearch_urls):
         """Test batch extraction from all Deepsearch URLs."""
         result = extract_identifiers_from_bibliography(

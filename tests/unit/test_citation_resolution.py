@@ -1,6 +1,7 @@
 """Unit tests for bibliography resolution to CSL-JSON."""
 
 import pytest
+from unittest.mock import Mock, patch
 
 from lit_agent.identifiers import resolve_bibliography
 
@@ -106,3 +107,79 @@ def test_resolve_bibliography_enriches_metadata(monkeypatch):
     assert citation["PMID"] == "11111111"
     assert citation["PMCID"] == "PMC9999999"
     assert citation["DOI"] == "10.4321/example.doi"
+
+
+@pytest.mark.unit
+def test_automatic_metadata_fetching_for_doi(monkeypatch):
+    """Test that metadata is automatically fetched for DOIs even without validate=True or metadata_lookup."""
+    url = "https://www.nature.com/articles/s41586-023-06502-w"
+
+    # Mock httpx.get to return fake CrossRef response
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "message": {
+            "title": ["Neural mechanisms of learning"],
+            "container-title": ["Nature"],
+            "author": [
+                {"family": "Smith", "given": "John"},
+                {"family": "Jones", "given": "Alice"}
+            ],
+            "published": {"date-parts": [[2025, 1, 15]]},
+            "volume": "523",
+            "issue": "7845",
+            "page": "123-145"
+        }
+    }
+
+    with patch('httpx.get', return_value=mock_response):
+        result = resolve_bibliography(
+            [url],
+            validate=False,  # Important: no validation, no custom metadata_lookup
+            scrape=False,
+            pdf=False
+        )
+
+    citation = list(result.citations.values())[0]
+
+    # Should have metadata from CrossRef via automatic fetching
+    assert citation.get("title") == "Neural mechanisms of learning"
+    assert citation.get("author") is not None
+    assert len(citation["author"]) == 2
+    assert citation["author"][0]["family"] == "Smith"
+    assert citation.get("container-title") == "Nature"
+    assert "auto_metadata_lookup" in citation["resolution"]["methods"]
+
+
+@pytest.mark.unit
+def test_automatic_metadata_fetching_for_pmid(monkeypatch):
+    """Test that metadata is automatically fetched for PMIDs via NCBI even without validate=True."""
+    url = "https://pubmed.ncbi.nlm.nih.gov/38448406/"
+
+    # Mock NCBI API validator to return metadata
+    mock_metadata = {
+        "title": "Sample PMID Article",
+        "authors": ["Doe J", "Smith A"],
+        "journal": "Sample Journal",
+        "pubdate": "2025 Feb 20",
+        "pmid": "38448406"
+    }
+
+    with patch('lit_agent.identifiers.api.NCBIAPIValidator') as MockValidator:
+        mock_instance = MockValidator.return_value
+        mock_instance.get_article_metadata.return_value = mock_metadata
+
+        result = resolve_bibliography(
+            [url],
+            validate=False,  # Important: no validation, no custom metadata_lookup
+            scrape=False,
+            pdf=False
+        )
+
+    citation = list(result.citations.values())[0]
+
+    # Should have metadata from NCBI via automatic fetching
+    assert citation.get("title") == "Sample PMID Article"
+    assert citation.get("author") is not None
+    assert citation.get("container-title") == "Sample Journal"
+    assert "auto_metadata_lookup" in citation["resolution"]["methods"]
